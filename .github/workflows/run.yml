@@ -1,28 +1,33 @@
 name: Fetch FreshForex spec and send to n8n
 
 on:
-  schedule:
-    - cron: "*/30 * * * *"   # каждые 30 минут
   workflow_dispatch:
+  schedule:
+    # каждые 30 минут (можешь поменять)
+    - cron: "*/30 * * * *"
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: Install deps
+      - name: Install dependencies
         run: npm install
 
-      - name: Install Playwright Chromium
+      # Устанавливаем браузер для Playwright (Chromium)
+      - name: Install Playwright (Chromium)
         run: npx playwright install --with-deps chromium
 
-     - name: Run
-  env:
-    N8N_WEBHOOK_URL: ${{ secrets.N8N_WEBHOOK_URL }}
-    N8N_TOKEN: ${{ secrets.N8N_TOKEN }}
-  run: npm run run
+      - name: Run collector
+        env:
+          N8N_WEBHOOK_URL: ${{ secrets.N8N_WEBHOOK_URL }}
+          N8N_TOKEN: ${{ secrets.N8N_TOKEN }}
+        run: npm run run
