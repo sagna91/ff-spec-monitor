@@ -21,7 +21,8 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run
-        env:
-          N8N_WEBHOOK_URL: ${{ secrets.N8N_WEBHOOK_URL }}
-        run: npm run run
+     - name: Run
+  env:
+    N8N_WEBHOOK_URL: ${{ secrets.N8N_WEBHOOK_URL }}
+    N8N_TOKEN: ${{ secrets.N8N_TOKEN }}
+  run: npm run run
