@@ -5,15 +5,14 @@ const SPEC_PAGE = "https://freshforex.com/traders/trading/specification-forex/";
 const API_URL = "https://freshforex.com/api/specification-param/";
 
 // GitHub Secrets:
-// - N8N_WEBHOOK_URL  (Production webhook URL, можно без token в query)
-// - N8N_TOKEN        (тот же токен, что проверяешь в n8n Auth check через header x-token)
+// - N8N_WEBHOOK_URL  (Production webhook URL)
+// - N8N_TOKEN        (например MY_SECRET_123)
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
 const N8N_TOKEN = process.env.N8N_TOKEN;
 
 if (!N8N_WEBHOOK_URL) throw new Error("Missing env N8N_WEBHOOK_URL");
 if (!N8N_TOKEN) throw new Error("Missing env N8N_TOKEN");
 
-// Базовые параметры запроса
 const BASE_FORM = {
   symbol_group: "1",
   currency: "USD",
@@ -21,7 +20,6 @@ const BASE_FORM = {
   lot: "1",
 };
 
-// Типы счетов (проверь, что 1/2/3 соответствуют Classic/Market Pro/ECN)
 const ACCOUNTS = [
   { type_account: "1", account_type: "Classic" },
   { type_account: "2", account_type: "Market Pro" },
@@ -45,6 +43,7 @@ async function fetchApiFromBrowser(page, formBody) {
       },
       body,
     });
+
     const text = await r.text();
     return { status: r.status, text };
   }, { url: API_URL, body: formBody });
@@ -52,8 +51,6 @@ async function fetchApiFromBrowser(page, formBody) {
   if (res.status !== 200) {
     throw new Error(`API status ${res.status}: ${res.text.slice(0, 300)}`);
   }
-
-  // Иногда CF может вернуть HTML вместо JSON
   if (res.text.trim().startsWith("<")) {
     throw new Error(`API returned HTML (Cloudflare): ${res.text.slice(0, 300)}`);
   }
@@ -79,12 +76,10 @@ async function main() {
 
   const page = await context.newPage();
 
-  // 1) Заходим на страницу, чтобы пройти CF в контексте браузера
+  // Зайдём на страницу, чтобы пройти CF в браузерном контексте
   await page.goto(SPEC_PAGE, { waitUntil: "domcontentloaded", timeout: 60000 });
-  // Немного подождём, чтобы CF/скрипты отработали
   await page.waitForTimeout(6000);
 
-  // 2) Забираем данные по каждому типу аккаунта
   for (const acc of ACCOUNTS) {
     const body = toForm({ ...BASE_FORM, type_account: acc.type_account });
     const data = await fetchApiFromBrowser(page, body);
@@ -108,15 +103,16 @@ async function main() {
 
   await browser.close();
 
-  // 3) Отправляем в n8n Webhook (токен в заголовке x-token)
-  const payload = { fetched_at, records: allRecords };
+  // ВАЖНО: токен кладём в BODY, чтобы n8n точно увидел его в $json.token
+  const payload = {
+    token: N8N_TOKEN,
+    fetched_at,
+    records: allRecords,
+  };
 
   const resp = await fetch(N8N_WEBHOOK_URL, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-token": N8N_TOKEN,
-    },
+    headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),
   });
 
@@ -125,9 +121,7 @@ async function main() {
     throw new Error(`Webhook error ${resp.status}: ${text.slice(0, 300)}`);
   }
 
-  console.log(
-    `OK: sent ${allRecords.length} records to n8n. Webhook response: ${text.slice(0, 200)}`
-  );
+  console.log(`OK: sent ${allRecords.length} records to n8n. Response: ${text.slice(0, 200)}`);
 }
 
 main().catch((e) => {
