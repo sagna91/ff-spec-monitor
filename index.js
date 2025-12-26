@@ -106,9 +106,9 @@ async function main() {
   // ВАЖНО: токен кладём в BODY, чтобы n8n точно увидел его в $json.token
   const payload = {
     token: N8N_TOKEN,
-    fetched_at,
-    records: allRecords,
-  };
+  fetched_at,
+  records: allRecords,
+};
 
   const resp = await fetch(N8N_WEBHOOK_URL, {
     method: "POST",
